@@ -101,9 +101,8 @@ You can disable this if you'd like.
 ## Feedback and more information
 
 Feel free to send us any feedback you may have either through Github or
-[Bluescape community forums](https://community.bluescape.com/).
+[Bluescape community forums](https://community.bluescape.com/t/stable-diffusion-automatic1111-bluescape-extension/3730).
 
 The extension is open source and licensed under [MIT License](LICENSE).
 
 If you are interested in developing on the Bluescape platform, please take a look at the [developer documentation](https://api.apps.us.bluescape.com/docs/).
-
