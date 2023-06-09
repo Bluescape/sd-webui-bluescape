@@ -266,7 +266,7 @@ class BluescapeUploadManager:
 
                             Feel free to send us any feedback you may have. Whether it's praise or constructive criticism.
 
-                            To share your thoughts, click [here](https://community.bluescape.com/)
+                            To share your thoughts, click [here](https://community.bluescape.com/t/stable-diffusion-automatic1111-bluescape-extension/3730)
 
                             For documentation on configuration options visit [Github](https://github.com/Bluescape/sd-webui-bluescape)
                             """
