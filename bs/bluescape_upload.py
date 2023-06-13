@@ -105,7 +105,7 @@ class Script(scripts.Script):
             if img2img_include_init_images and generation_type == "img2img" and p_img2img:
                 num_init_images = len(p_img2img.init_images)
 
-            if img2img_include_mask_image and p_img2img.image_mask is not None:
+            if img2img_include_mask_image and p_img2img is not None and p_img2img.image_mask is not None:
                 num_init_images = num_init_images + 1
                 include_mask = True
 
@@ -214,6 +214,13 @@ class Script(scripts.Script):
                         filename = f"image_mask.png"
                         png_data = io.BytesIO()
                         p_img2img.image_mask.save(png_data, format="PNG")
+
+                        seed = "image_mask"
+                        subseed = "unknown"
+                        infotext = "image_mask"
+
+                        traits = get_image_traits(enable_metadata, processed, seed, subseed, infotext, generation_type, upload_id)
+
                         self.manager.upload_image_at(png_data.getvalue(), filename, (x, y, width, height), traits)
 
                         label_x, label_y = label_layout[i]
