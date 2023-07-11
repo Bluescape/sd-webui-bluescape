@@ -27,6 +27,7 @@ from .bluescape_api import bs_get_all_workspaces
 from appdirs import AppDirs
 import subprocess
 from pathlib import Path
+from .misc import CanvasHeaderStrategy, CanvasTitleStrategy
 
 class StateManager:
 
@@ -44,8 +45,16 @@ class StateManager:
     scale_to_standard_size = True
     enable_metadata = True
     enable_analytics = True
+    user_swimlane = True
+    use_canvas_border_color = False
+    canvas_border_color = None
+    canvas_title_strategy = CanvasTitleStrategy.Default.value
+    canvas_header_strategy = CanvasHeaderStrategy.Default.value
+    nick_name = None
+    user_name = ""
+    token_exp = None
 
-    show_token_expired_status_message = False
+    token_expired = False
 
     img2img_include_mask_image = False
 
@@ -64,7 +73,7 @@ class StateManager:
     def read_versions(self, extension_file_path):
         if self.a1111_version != "unknown":
             return
-        
+
         try:
             self.a1111_version = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip().decode()
         except Exception:
@@ -80,9 +89,11 @@ class StateManager:
     def flush_user_data(self):
         self.user_token = ""
         self.user_id = ""
+        self.user_name = ""
         self.workspace_dd = {}
         self.workspace_ids = {}
         self.selected_workspace_id = ""
+        self.token_exp = None
         self.save()
 
     def refresh_workspaces(self, token):
@@ -113,6 +124,7 @@ class StateManager:
         with open(self.state_file, "w+") as out_file:
             json.dump({
                 "user_id": self.user_id,
+                "user_name": self.user_name,
                 "selected_workspace_id": self.selected_workspace_id,
                 "enable_verbose": self.enable_verbose,
                 "img2img_include_init_images": self.img2img_include_init_images,
@@ -120,9 +132,16 @@ class StateManager:
                 "scale_to_standard_size": self.scale_to_standard_size,
                 "enable_metadata": self.enable_metadata,
                 "enable_analytics": self.enable_analytics,
+                "user_swimlane": self.user_swimlane,
+                "use_canvas_border_color": self.use_canvas_border_color,
+                "canvas_border_color": self.canvas_border_color,
                 "workspace_dd": self.workspace_dd,
                 "workspace_ids": self.workspace_ids,
-                "user_token": self.user_token
+                "canvas_title_strategy": self.canvas_title_strategy,
+                "canvas_header_strategy": self.canvas_header_strategy,
+                "nick_name": self.nick_name,
+                "user_token": self.user_token,
+                "token_exp": self.token_exp
             }, out_file, indent = 6)
             out_file.close()
 
@@ -142,13 +161,29 @@ class StateManager:
                     self.scale_to_standard_size = data['scale_to_standard_size']
                     self.enable_metadata = data['enable_metadata']
                     self.enable_analytics = data['enable_analytics']
+                    self.user_swimlane = data['user_swimlane']
+                    self.canvas_title_strategy = data['canvas_title_strategy'] if data['canvas_title_strategy'] else CanvasTitleStrategy.Default.value
+                    self.canvas_header_strategy = data['canvas_header_strategy'] if data['canvas_header_strategy'] else CanvasHeaderStrategy.Default.value
+                    self.use_canvas_border_color = data['use_canvas_border_color']
+                    self.canvas_border_color = data['canvas_border_color'] if data["canvas_border_color"] else None
                     self.workspace_dd = data['workspace_dd']
                     self.workspace_ids = data['workspace_ids']
+                    self.nick_name = data['nick_name'] if data['nick_name'] else None
                     self.user_token = data['user_token']
                 except KeyError:
                     print('Unsupported state file version, flushing state...')
+
+                self.user_name = self.read_from_json(data, "user_name", "")
+                self.token_exp = self.read_from_json(data, "token_exp", None)
+
                 f.close()
 
         except json.JSONDecodeError:
             print("JSONDecode Error")
             return
+
+    def read_from_json(self, data, property_name, default_value):
+        if property_name in data:
+            return data[property_name]
+        else:
+            return default_value

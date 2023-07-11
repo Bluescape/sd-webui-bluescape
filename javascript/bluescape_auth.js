@@ -21,6 +21,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+var styles = `.bluescape-tab-active { background-color: #ef4444 !important; color: #2e363d !important; }`;
+
+var styleSheet = document.createElement("style");
+styleSheet.innerText = styles;
+document.head.appendChild(styleSheet);
+
+const tokenExpiredMessage = "<span style='color:red;'>Access to Bluescape has expired. Please login in the Bluescape tab.</span>";
+
 function bluescape_registration() {
     window.open("/bluescape/registration", "_blank");
 }
@@ -30,20 +39,28 @@ function bluescape_logout() {
 }
 
 function bluescape_update_status(input) {
-    const statuses = input.split("\n")
+    const statuses = input.split("\n");
+    const tokenExpired = statuses[3] === "True";
     const txt2imgStatusLabel = document.getElementById("bluescape-status-txt2img");
     const img2imgStatusLabel = document.getElementById("bluescape-status-img2img");
+    const selectedWorkspaceLabel = document.getElementById("selected-workspace-label");
+
+    HighlightBluescapeTab(tokenExpired)
 
     // This is a bit error prone and should be cleaned up
-    if (statuses[0] && txt2imgStatusLabel) {
-        txt2imgStatusLabel.innerHTML = statuses[0]
+    if (txt2imgStatusLabel) {
+        txt2imgStatusLabel.innerHTML = tokenExpired ? tokenExpiredMessage : statuses[0];
     }
-    if (statuses[1] && img2imgStatusLabel) {
-        img2imgStatusLabel.innerHTML = statuses[1]
+    if (img2imgStatusLabel) {
+        img2imgStatusLabel.innerHTML = tokenExpired ? tokenExpiredMessage : statuses[1];
+    }
+    if (selectedWorkspaceLabel) {
+        selectedWorkspaceLabel.innerHTML = statuses[2];
     }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
+
     const bsAuthSuccess = localStorage.getItem("bluescapeRefreshUI");
     if (bsAuthSuccess) {
         localStorage.removeItem("bluescapeRefreshUI");
@@ -79,4 +96,24 @@ function ClickOnBluescapeTab() {
     });
 
     return clicked;
+}
+
+function HighlightBluescapeTab(expired) {
+    if (expired){
+        document.getElementById("bs-token-expired-tip").style.display = "block";
+    } else{
+        document.getElementById("bs-token-expired-tip").style.display = "none";
+    }
+
+    // Note, for now disabling this as it can be annoying if you don't use Bluescape
+    // upload most of the time.
+    // Array.from(document.querySelectorAll('#tabs .tab-nav button')).forEach((link) => {
+    //     if (link.textContent === "Bluescape ") {
+    //         if (expired){
+    //             link.classList.add('bluescape-tab-active');
+    //         } else{
+    //             link.classList.remove('bluescape-tab-active');
+    //         }
+    //     }
+    // });
 }
