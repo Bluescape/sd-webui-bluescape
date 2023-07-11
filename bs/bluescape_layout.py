@@ -23,6 +23,8 @@
 #
 from typing import List, Tuple
 import math
+from .misc import CanvasHeaderStrategy, CanvasTitleStrategy
+from datetime import datetime
 
 class BluescapeLayout:
 
@@ -81,16 +83,37 @@ class BluescapeLayout:
         self.canvas_bounding_box = (new_x, new_y, self.canvas_bounding_box[2], self.canvas_bounding_box[3])
         self.image_grid_layout = self._translate_image_grid_layout(self.canvas_padding_left + new_x, self.canvas_padding_top + new_y)
 
-    # Text related public functions
+    def get_canvas_name(self, state, prompt, mode):
+        name = state.nick_name if state.nick_name else state.user_name
+        if state.canvas_title_strategy == CanvasTitleStrategy.Default.value:
+            return self._truncate_string("A1111 | " + prompt, 45)
+        elif state.canvas_title_strategy == CanvasTitleStrategy.Username.value:
+            return name
+        elif state.canvas_title_strategy == CanvasTitleStrategy.GenerationMode.value:
+            return mode
+        elif state.canvas_title_strategy == CanvasTitleStrategy.Timestamp.value:
+            return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            return self._truncate_string("A1111 | " + prompt, 45)
 
-    def get_canvas_title(self, text):
-        return self._truncate_string(text, 100)
+    # Text related public functions
 
     def get_top_title_location(self) -> Tuple[int, int, int]:
         return (self.canvas_bounding_box[0] + self.top_title_padding_left, self.canvas_bounding_box[1] + self.top_title_padding_top, self.canvas_bounding_box[2] - self.top_title_padding_left * 2)
 
-    def get_top_title(self, text):
-        return self._truncate_string(text, 145)
+    def get_top_title(self, prompt, mode, state):
+        text = self._truncate_string(prompt, 145)
+        name = state.nick_name if state.nick_name else state.user_name
+        if state.canvas_header_strategy == CanvasHeaderStrategy.Default.value:
+            return ("A1111", text)
+        elif state.canvas_header_strategy == CanvasHeaderStrategy.Username.value:
+            return (name, text)
+        elif state.canvas_header_strategy == CanvasHeaderStrategy.GenerationMode.value:
+            return (mode, text)
+        elif state.canvas_header_strategy == CanvasHeaderStrategy.Timestamp.value:
+            return (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), text)
+        else:
+            return ("A1111", text)
 
     def get_bottom_infobar_location(self) -> Tuple[int, int, int]:
         return (self.canvas_bounding_box[0] + self.top_title_padding_left, self.canvas_bounding_box[1] + self.canvas_bounding_box[3] - self.bottom_infobar_top_from_bottom, self.canvas_bounding_box[2] - self.top_title_padding_left * 2)

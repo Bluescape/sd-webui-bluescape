@@ -23,7 +23,7 @@
 #
 from modules.processing import Processed
 
-def get_image_traits(enable_metadata: bool, processed: Processed, seed, subseed, infotext, generation_type, upload_id):
+def get_image_traits(enable_metadata: bool, processed: Processed, seed, subseed, infotext, generation_type, upload_id, user_id):
 
     if enable_metadata:
         traits = {
@@ -60,15 +60,17 @@ def get_image_traits(enable_metadata: bool, processed: Processed, seed, subseed,
                 "upload_id": str(upload_id),
             }),
             "http://bluescape.dev/automatic1111-extension/v1/uploadId": str(upload_id),
+            "http://bluescape.dev/automatic1111-extension/v1/userId": str(user_id),
         }
     else:
         traits = {
             "http://bluescape.dev/automatic1111-extension/v1/enabled": False,
+            "http://bluescape.dev/automatic1111-extension/v1/userId": str(user_id),
         }
 
     return traits
 
-def get_canvas_traits(enable_metadata: bool, processed: Processed, generation_type, upload_id, num_images):
+def get_canvas_traits(enable_metadata: bool, processed: Processed, generation_type, upload_id, num_images, user_id):
 
     if enable_metadata:
         traits = {
@@ -109,10 +111,12 @@ def get_canvas_traits(enable_metadata: bool, processed: Processed, generation_ty
                 "upload_id": str(upload_id),
             }),
             "http://bluescape.dev/automatic1111-extension/v1/uploadId": str(upload_id),
+            "http://bluescape.dev/automatic1111-extension/v1/userId": str(user_id),
         }
     else:
         traits = {
             "http://bluescape.dev/automatic1111-extension/v1/enabled": False,
+            "http://bluescape.dev/automatic1111-extension/v1/userId": str(user_id),
         }
 
     return traits

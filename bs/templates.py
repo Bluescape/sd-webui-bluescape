@@ -23,7 +23,11 @@
 #
 from .config import Config
 
-
+def status_block(block_id):
+    return f"""
+        <div style="margin-bottom: var(--spacing-lg); color: var(--block-info-text-color); font-weight: var(--block-info-text-weight); font-size: var(--block-info-text-size); line-height: var(--line-sm);">Status<div>
+        <div style="margin-top: var(--spacing-lg); color: var(--body-text-color); font-weight: var(--checkbox-label-text-weight); font-size: var(--checkbox-label-text-size);" id="{block_id}">Idle</div>
+    """
 
 def login_endpoint_page(challenge):
     return f"""
@@ -66,4 +70,4 @@ bluescape_open_workspace_function = f"""
         }}
     """
 
-expired_token_message_block = "<span style='color:red;'>Bluescape auth has expired. Please login in the Bluescape tab.</span>"
+workspace_label_block = "Selected workspace: <b id='selected-workspace-label'></b>"

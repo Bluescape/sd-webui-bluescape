@@ -23,22 +23,25 @@
 #
 from __future__ import annotations
 import json
+import datetime
 from typing import Tuple
 from .expired_token_exception import ExpiredTokenException
-from .templates import bluescape_auth_function, bluescape_open_workspace_function, login_endpoint_page, refresh_ui_page, registration_endpoint_page, expired_token_message_block
+from .templates import bluescape_auth_function, bluescape_open_workspace_function, login_endpoint_page, refresh_ui_page, registration_endpoint_page
 from .config import Config
 from .analytics import Analytics
-from .bluescape_api import bs_create_extended_data, bs_create_canvas_at, bs_create_generation_label, bs_create_generation_data, bs_create_label, bs_create_seed, bs_create_top_title, bs_find_space, bs_upload_image_at, bs_get_user_id
+from .bluescape_api import bs_create_extended_data, bs_create_canvas_at, bs_create_generation_label, bs_create_generation_data, bs_create_label, bs_create_seed, bs_create_top_title, bs_find_space, bs_get_existing_canvases, bs_upload_image_at, bs_get_user_info
 from .state_manager import StateManager
-from .misc import extract_workspace_id
+from .misc import CanvasHeaderStrategy, extract_workspace_id, extract_token_exp, CanvasTitleStrategy, SuggestedCanvasBorderColors
 import gradio as gr
 import modules.scripts as scripts
 import uuid
+import math
 import pkce
 from modules import script_callbacks
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 import requests
+import random
 
 class BluescapeUploadManager:
 
@@ -73,12 +76,15 @@ class BluescapeUploadManager:
         if response.status_code == 200:
             response_info = json.loads(response.text)
             token = response_info['access_token']
-            user_id = bs_get_user_id(token)
+            user_id, user_name = bs_get_user_info(token)
             # refresh_workspaces saves state afterwards
             self.state.user_token = token
             self.state.user_id = user_id
+            self.state.user_name = user_name
+            self.state.token_exp = extract_token_exp(token)
+
             self.state.save()
-            self.state.show_token_expired_status_message = False
+            self.state.token_expired = False
             self.analytics.send_user_logged_in_event(token, user_id)
             self.state.refresh_workspaces(token)
             return refresh_ui_page()
@@ -92,10 +98,19 @@ class BluescapeUploadManager:
         return refresh_ui_page()
 
     def bluescape_status_endpoint(self):
-        if self.state.show_token_expired_status_message:
-            return expired_token_message_block + "\n" + expired_token_message_block
+
+        # Check whether token expired
+        now = math.trunc((datetime.datetime.utcnow()).timestamp())
+        if self.state.token_exp is not None and now > self.state.token_exp:
+            self.state.token_expired = True
         else:
-            return self.state.txt2img_status + "\n" + self.state.img2img_status
+            self.state.token_expired = False
+
+        selected_workspace_item = self.get_selected_workspace_item()
+        if selected_workspace_item is None:
+            selected_workspace_item = " "
+
+        return self.state.txt2img_status + "\n" + self.state.img2img_status + "\n" + selected_workspace_item + "\n" + str(self.state.token_expired)
 
     def bluescape_register_endpoint(self):
         registration_attempt_id = str(uuid.uuid4())
@@ -123,14 +138,17 @@ class BluescapeUploadManager:
     def upload_image_at(self, buffer, filename, bounding_box: Tuple[int, int, int, int], traits):
         bs_upload_image_at(self.state.user_token, self.state.selected_workspace_id, buffer, filename, bounding_box, traits)
 
-    def create_canvas_at(self, title, bounding_box: Tuple[int, int, int, int], traits):
-        return bs_create_canvas_at(self.state.user_token, self.state.selected_workspace_id, title, bounding_box, traits)
+    def create_canvas_at(self, title, bounding_box: Tuple[int, int, int, int], traits, canvas_color):
+        return bs_create_canvas_at(self.state.user_token, self.state.selected_workspace_id, title, bounding_box, traits, canvas_color)
 
-    def find_space(self, bounding_box: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
-        return bs_find_space(self.state.user_token, self.state.selected_workspace_id, bounding_box)
+    def find_space(self, bounding_box: Tuple[int, int, int, int], direction) -> Tuple[int, int, int, int]:
+        return bs_find_space(self.state.user_token, self.state.selected_workspace_id, bounding_box, direction)
 
-    def create_top_title(self, location: Tuple[int, int, int], title):
-        return bs_create_top_title(self.state.user_token, self.state.selected_workspace_id, location, title)
+    def get_existing_canvases(self):
+        return bs_get_existing_canvases(self.state.user_token, self.state.selected_workspace_id)
+
+    def create_top_title(self, location: Tuple[int, int, int], title, header):
+        return bs_create_top_title(self.state.user_token, self.state.selected_workspace_id, location, title, header)
 
     def create_extended_data(self, location: Tuple[int, int, int], extended_generation_data):
         return bs_create_extended_data(self.state.user_token, self.state.selected_workspace_id, location, extended_generation_data)
@@ -165,6 +183,12 @@ class BluescapeUploadManager:
     def get_enable_analytics(self):
         return self.state.enable_analytics
 
+    def get_user_swimlane(self):
+        return self.state.user_swimlane
+
+    def get_use_canvas_border_color(self):
+        return self.state.use_canvas_border_color
+
     def is_empty_user_token(self):
         return self.state.user_token == ""
 
@@ -176,6 +200,20 @@ class BluescapeUploadManager:
 
     def get_selected_workspace_item(self):
         return self.state.get_selected_workspace_item()
+
+    def get_canvas_title(self):
+        return self.state.canvas_title_strategy
+
+    def get_canvas_header(self):
+        return self.state.canvas_header_strategy
+
+    def get_canvas_border_color(self):
+        color = self.state.canvas_border_color
+        return color if color else random.choice(list(SuggestedCanvasBorderColors)).value
+
+    def get_nick_name(self):
+        name = self.state.nick_name
+        return name if name else self.state.user_name
 
     def on_ui_tabs(self):
 
@@ -199,7 +237,7 @@ class BluescapeUploadManager:
                     ]
                 except ExpiredTokenException:
                     print("Bluescape token has expired")
-                    self.state.show_token_expired_status_message = True
+                    self.state.token_expired = True
                     self.state.user_token = ""
                     self.state.save()
 
@@ -216,6 +254,13 @@ class BluescapeUploadManager:
 
             with gr.Row():
                 with gr.Column():
+                    with gr.Row():
+                        gr.Markdown(elem_id="bs-token-expired-tip", value=
+                            """
+                            # 🔴 Access to Bluescape has expired. Please login again.
+
+                            """
+                        )
                     with gr.Row(variant="panel"):
                         gr.Markdown(
                             """
@@ -251,13 +296,31 @@ class BluescapeUploadManager:
                         gr.Markdown(
                             """
                             # Configuration
+                            _See [documentation](https://github.com/Bluescape/sd-webui-bluescape#configuration-options) for further details on each configuration option._
+                            ## General
                             """)
                     enable_verbose_checkbox = gr.Checkbox(label="Include extended generation data in workspace", value=self.get_enable_verbose, interactive=True)
                     img2img_include_init_images_checkbox = gr.Checkbox(label="Include source image in workspace (img2img)", value=self.get_img2img_include_init_images, interactive=True)
                     img2img_include_mask_image_checkbox = gr.Checkbox(label="Include image mask in workspace (img2img)", value=self.get_img2img_include_mask_image, interactive=True)
                     scale_to_standard_size_checkbox = gr.Checkbox(label="Scale images to standard size (1000x1000) in workspace", value=self.get_scale_to_standard_size, interactive=True)
-                    enable_metadata_checkbox = gr.Checkbox(label="Store metadata in image object within workspace", value=self.get_enable_metadata, interactive=True)
+                    enable_metadata_checkbox = gr.Checkbox(label="Store generation data as metadata in image object within workspace", value=self.get_enable_metadata, interactive=True)
                     enable_analytics_checkbox = gr.Checkbox(label="Send extension usage analytics", value=self.get_enable_analytics, interactive=True)
+
+                    with gr.Row():
+                        gr.Markdown(
+                            """
+                            ## Canvas
+                            """)
+                    canvas_title_dropdown = gr.Dropdown(label="Title format", choices=[strategy.value for strategy in CanvasTitleStrategy], value=self.get_canvas_title, interactive=True)
+                    canvas_header_dropdown = gr.Dropdown(label="Header format", choices=[strategy.value for strategy in CanvasHeaderStrategy], value=self.get_canvas_header, interactive=True)
+                    user_swimlane_checkbox = gr.Checkbox(label="User specific canvas placement", value=self.get_user_swimlane, interactive=True)
+                    with gr.Row():
+                        with gr.Column():
+                            use_canvas_border_color_checkbox = gr.Checkbox(label="Use canvas border color", value=self.get_use_canvas_border_color, interactive=True)
+                        with gr.Column():
+                            canvas_border_color_picker = gr.ColorPicker(label="Color", value=self.get_canvas_border_color, interactive=True)
+
+                    nickname_textbox = gr.Textbox(label="Override user name for title and header", interactive=True, value=self.get_nick_name)
 
                     with gr.Row(variant="panel"):
                         gr.Markdown(
@@ -268,7 +331,7 @@ class BluescapeUploadManager:
 
                             To share your thoughts, click [here](https://community.bluescape.com/t/stable-diffusion-automatic1111-bluescape-extension/3730)
 
-                            For documentation on configuration options visit [Github](https://github.com/Bluescape/sd-webui-bluescape)
+                            For further documentation on the project visit [Github](https://github.com/Bluescape/sd-webui-bluescape)
                             """
                         )
 
@@ -288,6 +351,18 @@ class BluescapeUploadManager:
 
             def enable_analytics_change(input):
                 self.state.enable_analytics = input
+                self.state.save()
+
+            def user_swimlane_change(input):
+                self.state.user_swimlane = input
+                self.state.save()
+
+            def canvas_border_color_change(input):
+                self.state.canvas_border_color = input
+                self.state.save()
+
+            def use_canvas_border_color_change(input):
+                self.state.use_canvas_border_color = input
                 self.state.save()
 
             def enable_verbose_change(input):
@@ -310,6 +385,18 @@ class BluescapeUploadManager:
                 self.state.scale_to_standard_size = input
                 self.state.save()
 
+            def canvas_title_dropdown_change(input):
+                self.state.canvas_title_strategy = input
+                self.state.save()
+
+            def canvas_header_dropdown_change(input):
+                self.state.canvas_header_strategy = input
+                self.state.save()
+
+            def nickname_textbox_change(input):
+                self.state.nick_name = input
+                self.state.save()
+
             # Event handlers assignment
             login_button.click(None, _js=bluescape_auth_function)
             logout_button.click(None, _js="bluescape_logout")
@@ -323,5 +410,11 @@ class BluescapeUploadManager:
             scale_to_standard_size_checkbox.change(scale_to_standard_size_change, inputs=[scale_to_standard_size_checkbox])
             enable_metadata_checkbox.change(enable_metadata_change, inputs=[enable_metadata_checkbox])
             enable_analytics_checkbox.change(enable_analytics_change, inputs=[enable_analytics_checkbox])
+            user_swimlane_checkbox.change(user_swimlane_change, inputs=[user_swimlane_checkbox])
+            canvas_border_color_picker.change(canvas_border_color_change, inputs=[canvas_border_color_picker])
+            use_canvas_border_color_checkbox.change(use_canvas_border_color_change, inputs=[use_canvas_border_color_checkbox])
+            canvas_title_dropdown.change(canvas_title_dropdown_change, inputs=[canvas_title_dropdown])
+            canvas_header_dropdown.change(canvas_header_dropdown_change, inputs=[canvas_header_dropdown])
+            nickname_textbox.change(nickname_textbox_change, inputs=[nickname_textbox])
 
         return ((bluescape_tab, "Bluescape", "bluescape-tab"),)

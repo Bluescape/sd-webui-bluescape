@@ -22,6 +22,8 @@
 # SOFTWARE.
 #
 import re
+
+from bs.misc import hex_to_bluescape_rgb
 from .expired_token_exception import ExpiredTokenException
 from .config import Config
 from typing import Tuple
@@ -30,14 +32,14 @@ import json
 
 default_timeout = 30
 
-def bs_find_space(token, workspace_id, bounding_box: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+def bs_find_space(token, workspace_id, bounding_box: Tuple[int, int, int, int], direction) -> Tuple[int, int, int, int]:
 
     x, y, width, height = bounding_box
 
     bs_api_url = f'{Config.api_base_domain}/v3/workspaces/{workspace_id}/findAvailableArea'
 
     body =  {
-        "direction": "Right",
+        "direction": direction,
         "proposedArea": {
             "x": x,
             "y": y,
@@ -57,6 +59,19 @@ def bs_find_space(token, workspace_id, bounding_box: Tuple[int, int, int, int]) 
             height = int(result["height"])
 
             return (x, y, width, height)
+
+    elif response.status_code == 401:
+        raise ExpiredTokenException
+
+def bs_get_existing_canvases(token, workspace_id):
+
+    bs_api_url = f'{Config.api_base_domain}/v3/workspaces/{workspace_id}/elements?type=Canvas'
+
+    response = requests.get(bs_api_url, headers = get_headers(token), timeout = default_timeout)
+
+    if response.status_code == 200:
+        result = response.json()
+        return result["data"]
 
     elif response.status_code == 401:
         raise ExpiredTokenException
@@ -124,9 +139,11 @@ def bs_upload_image_at(token, workspace_id, buffer, filename, bounding_box: Tupl
     bs_upload_asset(zygote, buffer)
     bs_finish_asset(token, workspace_id, zygote['data']['content']['uploadId'])
 
-def bs_create_canvas_at(token, workspace_id, title, bounding_box: Tuple[int, int, int, int], traits):
+def bs_create_canvas_at(token, workspace_id, title, bounding_box: Tuple[int, int, int, int], traits, canvas_color):
 
     x, y, width, height = bounding_box
+
+    border_color = hex_to_bluescape_rgb(canvas_color)
 
     body = {
         'type': 'Canvas',
@@ -140,12 +157,7 @@ def bs_create_canvas_at(token, workspace_id, title, bounding_box: Tuple[int, int
                 'b': 255,
                 'a': 1
             },
-            'borderColor': {
-                'r': 255,
-                'g': 255,
-                'b': 255,
-                'a': 1
-            },
+            'borderColor': border_color,
             'showName': True
         },
         'transform': {
@@ -179,7 +191,7 @@ def bs_create_text_with_body(token, workspace_id, body):
 
     return response_info['data']['id']
 
-def bs_create_top_title(token, workspace_id, location: Tuple[int, int, int], text):
+def bs_create_top_title(token, workspace_id, location: Tuple[int, int, int], text, header):
 
     title = "  |  " + text
 
@@ -190,7 +202,7 @@ def bs_create_top_title(token, workspace_id, location: Tuple[int, int, int], tex
                 "block": {
                     "content": [
                         {
-                            "text": "Automatic1111"
+                            "text": header
                         },
                         {
                             "span": {
@@ -600,15 +612,15 @@ def bs_get_workspaces(token, cursor = None):
         return (response_info['workspaces'], response_info['next'])
     elif response.status_code == 401:
         raise ExpiredTokenException
-    
-def bs_get_user_id(token):
+
+def bs_get_user_info(token):
         url = f'{Config.api_base_domain}/v3/users/me'
 
         response = requests.get(url, headers = get_headers(token))
 
         if response.status_code == 200:
             response_info = json.loads(response.text)
-            return response_info["id"]
+            return (response_info["id"], response_info["firstName"] + " " + response_info["lastName"])
 
         print("Error: " + response.text)
 
