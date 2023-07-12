@@ -124,7 +124,7 @@ class Script(scripts.Script):
             direction = FindSpaceDirection.Right
 
             # We'll use this for padding between the swimlanes, if necessary
-            canvas_y_padding = 1000
+            canvas_y_padding = 1500
 
             try:
                 # Ok, now lets see where to place this. This is quite ugly.
