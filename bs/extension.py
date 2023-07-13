@@ -23,7 +23,7 @@
 #
 from __future__ import annotations
 import json
-import datetime
+from datetime import datetime, timezone
 from typing import Tuple
 from .expired_token_exception import ExpiredTokenException
 from .templates import bluescape_auth_function, bluescape_open_workspace_function, login_endpoint_page, refresh_ui_page, registration_endpoint_page
@@ -100,7 +100,9 @@ class BluescapeUploadManager:
     def bluescape_status_endpoint(self):
 
         # Check whether token expired
-        now = math.trunc((datetime.datetime.utcnow()).timestamp())
+        # The token expiration is in UTC, so we need to get the
+        # now in utc timezone as well
+        now = math.trunc(datetime.now(tz=timezone.utc).timestamp())
         if self.state.token_exp is not None and now > self.state.token_exp:
             self.state.token_expired = True
         else:
