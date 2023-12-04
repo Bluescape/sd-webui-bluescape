@@ -1,5 +1,7 @@
 # Bluescape Extension for Stable Diffusion WebUI
 
+> :warning: **This extension is deprecated:** You can continue to use it as is, but no further updates are planned. Please check out <https://bluescape.ai> for Generative AI in Bluescape workspaces. 
+
 Upload generated images to a Bluescape workspace for review and collaborate with others.
 
 ![Uploading images to Bluescape Worksapce](resources/02-uploading-to-bluescape.png "Uploading images to Bluescape Worksapce")
